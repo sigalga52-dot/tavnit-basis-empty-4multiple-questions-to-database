@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תבנית משחק הסתברות</title>
+  
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --ink: #17213b;
+      --paper: #fffdf6;
+      --sun: #ffd166;
+      --coral: #ef6262;
+      --teal: #1da1a2;
+      --navy: #253a72;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      width: 100%;
+      min-height: calc(100 * min(var(--vh, 1vh), 1vh));
+      margin: 0;
+      color: var(--ink);
+      font-family: "Rubik", sans-serif;
+    }
+
+    .app-shell {
+      width: 100%;
+      min-height: calc(100 * min(var(--vh, 1vh), 1vh));
+      overflow: hidden;
+      position: relative;
+    }
+
+    .app-shell::before,
+    .app-shell::after {
+      content: "";
+      position: fixed;
+      z-index: 0;
+      border-radius: 999px;
+      opacity: .34;
+      pointer-events: none;
+    }
+
+    .app-shell::before {
+      width: 340px;
+      height: 340px;
+      background: #ffd166;
+      top: -140px;
+      right: -100px;
+    }
+
+    .app-shell::after {
+      width: 280px;
+      height: 280px;
+      background: #78d5d6;
+      bottom: -120px;
+      left: -90px;
+    }
+
+    .stage-wrap {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 20px 42px;
+    }
+
+    .paper-card {
+      background: rgba(255, 253, 246, .92);
+      border: 2px solid rgba(23, 33, 59, .12);
+      box-shadow: 8px 9px 0 rgba(23, 33, 59, .12);
+    }
+
+    .hero-card {
+      overflow: hidden;
+      border-radius: 28px;
+    }
+
+    .dice-image {
+      width: 100%;
+      height: 100%;
+      min-height: 240px;
+      object-fit: cover;
+      mix-blend-mode: multiply;
+    }
+
+    .burst {
+      width: 56px;
+      height: 56px;
+      display: inline-grid;
+      place-items: center;
+      background: var(--sun);
+      border: 2px solid var(--ink);
+      box-shadow: 4px 4px 0 var(--ink);
+      transform: rotate(-8deg);
+    }
+
+    .quiz-card {
+      max-width: 760px;
+      margin: 28px auto 0;
+      padding: 28px;
+      border-radius: 28px;
+    }
+
+    .choice {
+      width: 100%;
+      text-align: right;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 15px 17px;
+      border: 2px solid rgba(23, 33, 59, .18);
+      border-radius: 16px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .choice:hover:not(:disabled) {
+      transform: translateX(-4px);
+      border-color: var(--teal);
+      box-shadow: 4px 4px 0 rgba(29, 161, 162, .24);
+    }
+
+    .choice:focus-visible,
+    .primary-button:focus-visible,
+    .secondary-button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid var(--coral);
+      outline-offset: 3px;
+    }
+
+    .choice:disabled { cursor: default; }
+
+    .choice.is-correct {
+      border-color: #198754;
+      background: #e7f7ec;
+    }
+
+    .choice.is-wrong {
+      border-color: var(--coral);
+      background: #fff0ef;
+    }
+
+    .choice-marker {
+      min-width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #edf0f7;
+      font-weight: 800;
+    }
+
+    .progress-track {
+      height: 13px;
+      border: 2px solid rgba(23, 33, 59, .18);
+      border-radius: 999px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 25%;
+      background: linear-gradient(90deg, #1da1a2, #78d5d6);
+      transition: width .35s ease;
+    }
+
+    .feedback {
+      border-radius: 15px;
+      padding: 14px 16px;
+      margin-top: 18px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .feedback.good {
+      background: #e7f7ec;
+      border: 1px solid #8bd3aa;
+      color: #155d38;
+    }
+
+    .feedback.bad {
+      background: #fff0ef;
+      border: 1px solid #f3aaa6;
+      color: #9a2923;
+    }
+
+    .primary-button,
+    .secondary-button {
+      border: 2px solid var(--ink);
+      border-radius: 15px;
+      padding: 13px 20px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 var(--ink);
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+
+    .primary-button:hover:not(:disabled),
+    .secondary-button:hover:not(:disabled) {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .primary-button:disabled,
+    .secondary-button:disabled {
+      cursor: not-allowed;
+      opacity: .65;
+      box-shadow: none;
+    }
+
+    .next-row {
+      min-height: 54px;
+      margin-top: 20px;
+    }
+
+    .hidden-panel { display: none !important; }
+
+    .stage-panel { animation: slideIn .32s ease both; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 640px) {
+      .stage-wrap { padding: 16px 14px 30px; }
+      .quiz-card { padding: 20px; }
+      .hero-copy { padding: 26px 22px; }
+      .dice-image { min-height: 175px; }
+    }
+  </style>
+ </head>
+ <body data-template-id="__page-root">
+  <div class="app-shell">
+   <header class="stage-wrap pb-0">
+    <div data-template-id="top-banner" class="canva-banner paper-card rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+     <div class="flex items-center gap-3"><span class="burst rounded-full" aria-hidden="true"><i data-lucide="dices" style="width:27px;height:27px;"></i></span>
+      <div>
+       <h1 data-template-id="app-title" class="canva-text m-0 font-extrabold">תבנית משחק - יש לשנות שם</h1>
+       <p data-template-id="app-kicker" class="canva-text m-0 mt-1"></p>
+      </div>
+     </div><span data-template-id="question-counter" class="canva-tag rounded-full px-3 py-2 font-bold"></span>
+    </div>
+   </header>
+   
+   <main class="stage-wrap">
+    <!-- Welcome Screen -->
+    <section id="welcome-screen" class="hero-card paper-card grid md:grid-cols-2">
+     <div class="hero-copy p-9 flex flex-col justify-center"><span data-template-id="welcome-tag" class="canva-tag inline-flex self-start rounded-full px-3 py-2 font-bold mb-4">ברוכים הבאים</span>
+      <h2 data-template-id="welcome-heading" class="canva-text m-0 font-extrabold">כותרת המשחק שלך</h2>
+      <p data-template-id="welcome-copy" class="canva-text leading-8 mt-4 mb-7">בואו לבדוק מה אתם יודעים! ענו על השאלות ואספו נקודות.</p>
+      <form id="start-form" class="space-y-4">
+       <div>
+         <label data-template-id="player-name-label" class="canva-text block font-bold mb-2" for="player-name">שם השחקן/ית:</label> 
+         <input data-template-id="player-name-input" id="player-name" type="text" maxlength="40" required class="canva-input w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-slate-800">
+       </div>
+       <button data-template-id="start-button" class="canva-button primary-button w-full" type="submit">התחילו משחק</button>
+       <p id="start-error" data-template-id="start-error-text" class="canva-text hidden-panel text-center font-medium" role="alert">אנא הזינו שם כדי להתחיל</p>
+      </form>
+     </div>
+     <div class="bg-[#d8f2ef] min-h-[260px]">
+       <img src="https://images.unsplash.com/photo-1570303345338-e1f0eddf4946?auto=format&fit=crop&w=600&q=80" alt="Dice" class="dice-image" loading="lazy">
+     </div>
+    </section>
+
+    <!-- Game Screen -->
+    <section id="game-screen" class="hidden-panel" aria-live="polite">
+     <div class="max-w-[760px] mx-auto mt-6">
+      <div class="flex items-center justify-between gap-4 mb-3"><span data-template-id="progress-label" class="canva-text font-bold">התקדמות</span> <span id="progress-text" class="font-bold text-[#253a72]"></span>
+      </div>
+      <div class="progress-track" aria-label="התקדמות במשחק">
+       <div id="progress-fill" class="progress-fill"></div>
+      </div>
+     </div>
+     
+     <!-- Stage 1 -->
+     <article id="stage-1" class="stage-panel quiz-card paper-card">
+      <div class="flex items-center gap-3 mb-5"><span data-template-id="stage-1-number" class="canva-tag rounded-full px-3 py-2 font-extrabold">1</span> <span data-template-id="stage-1-topic" class="canva-text font-bold">שאלה ראשונה</span>
+      </div>
+      <h2 data-template-id="stage-1-question" class="canva-text m-0 font-extrabold">כאן יש להכניס את שאלה 1</h2>
+      <div class="space-y-3 mt-7" role="group">
+          <button data-template-id="s1-a" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">א</span>כאן יש להכניס מסיח 1</button> 
+          <button data-template-id="s1-b" class="canva-button choice" type="button" data-correct="true"><span class="choice-marker">ב</span>כאן יש להכניס תשובה נכונה</button> 
+          <button data-template-id="s1-c" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ג</span>כאן יש להכניס מסיח 2</button> 
+          <button data-template-id="s1-d" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ד</span>כאן יש להכניס מסיח 3</button>
+      </div>
+      <p data-template-id="s1-correct-feedback" class="canva-text feedback good hidden-panel">
+        <i data-lucide="check-circle" class="w-5 h-5"></i> כל הכבוד! תשובה נכונה.
+      </p>
+      <p data-template-id="s1-wrong-feedback" class="canva-text feedback bad hidden-panel">
+        <i data-lucide="x-circle" class="w-5 h-5"></i> טעות, לא נורא!
+      </p>
+      <div class="next-row"><button data-template-id="s1-next" class="canva-button primary-button hidden-panel" type="button" data-next="2">לשאלה הבאה</button>
+      </div>
+     </article>
+
+     <!-- Stage 2 -->
+     <article id="stage-2" class="stage-panel quiz-card paper-card hidden-panel">
+      <div class="flex items-center gap-3 mb-5"><span data-template-id="stage-2-number" class="canva-tag rounded-full px-3 py-2 font-extrabold">2</span> <span data-template-id="stage-2-topic" class="canva-text font-bold">שאלה שנייה</span>
+      </div>
+      <h2 data-template-id="stage-2-question" class="canva-text m-0 font-extrabold">כאן יש להכניס את שאלה 2</h2>
+      <div class="space-y-3 mt-7" role="group">
+          <button data-template-id="s2-a" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">א</span>כאן יש להכניס מסיח 1</button> 
+          <button data-template-id="s2-b" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ב</span>כאן יש להכניס מסיח 2</button> 
+          <button data-template-id="s2-c" class="canva-button choice" type="button" data-correct="true"><span class="choice-marker">ג</span>כאן יש להכניס תשובה נכונה</button> 
+          <button data-template-id="s2-d" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ד</span>כאן יש להכניס מסיח 3</button>
+      </div>
+      <p data-template-id="s2-correct-feedback" class="canva-text feedback good hidden-panel">
+        <i data-lucide="check-circle" class="w-5 h-5"></i> כל הכבוד! תשובה נכונה.
+      </p>
+      <p data-template-id="s2-wrong-feedback" class="canva-text feedback bad hidden-panel">
+        <i data-lucide="x-circle" class="w-5 h-5"></i> טעות, לא נורא!
+      </p>
+      <div class="next-row"><button data-template-id="s2-next" class="canva-button primary-button hidden-panel" type="button" data-next="3">לשאלה הבאה</button>
+      </div>
+     </article>
+
+     <!-- Stage 3 -->
+     <article id="stage-3" class="stage-panel quiz-card paper-card hidden-panel">
+      <div class="flex items-center gap-3 mb-5"><span data-template-id="stage-3-number" class="canva-tag rounded-full px-3 py-2 font-extrabold">3</span> <span data-template-id="stage-3-topic" class="canva-text font-bold">שאלה שלישית</span>
+      </div>
+      <h2 data-template-id="stage-3-question" class="canva-text m-0 font-extrabold">כאן יש להכניס את שאלה 3</h2>
+      <div class="space-y-3 mt-7" role="group">
+          <button data-template-id="s3-a" class="canva-button choice" type="button" data-correct="true"><span class="choice-marker">א</span>כאן יש להכניס תשובה נכונה</button> 
+          <button data-template-id="s3-b" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ב</span>כאן יש להכניס מסיח 1</button> 
+          <button data-template-id="s3-c" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ג</span>כאן יש להכניס מסיח 2</button> 
+          <button data-template-id="s3-d" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ד</span>כאן יש להכניס מסיח 3</button>
+      </div>
+      <p data-template-id="s3-correct-feedback" class="canva-text feedback good hidden-panel">
+        <i data-lucide="check-circle" class="w-5 h-5"></i> כל הכבוד! תשובה נכונה.
+      </p>
+      <p data-template-id="s3-wrong-feedback" class="canva-text feedback bad hidden-panel">
+        <i data-lucide="x-circle" class="w-5 h-5"></i> טעות, לא נורא!
+      </p>
+      <div class="next-row"><button data-template-id="s3-next" class="canva-button primary-button hidden-panel" type="button" data-next="4">לשאלה הבאה</button>
+      </div>
+     </article>
+
+     <!-- Stage 4 -->
+     <article id="stage-4" class="stage-panel quiz-card paper-card hidden-panel">
+      <div class="flex items-center gap-3 mb-5"><span data-template-id="stage-4-number" class="canva-tag rounded-full px-3 py-2 font-extrabold">4</span> <span data-template-id="stage-4-topic" class="canva-text font-bold">שאלה רביעית</span>
+      </div>
+      <h2 data-template-id="stage-4-question" class="canva-text m-0 font-extrabold">כאן יש להכניס את שאלה 4</h2>
+      <div class="space-y-3 mt-7" role="group">
+          <button data-template-id="s4-a" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">א</span>כאן יש להכניס מסיח 1</button> 
+          <button data-template-id="s4-b" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ב</span>כאן יש להכניס מסיח 2</button> 
+          <button data-template-id="s4-c" class="canva-button choice" type="button" data-correct="false"><span class="choice-marker">ג</span>כאן יש להכניס מסיח 3</button> 
+          <button data-template-id="s4-d" class="canva-button choice" type="button" data-correct="true"><span class="choice-marker">ד</span>כאן יש להכניס תשובה נכונה</button>
+      </div>
+      <p data-template-id="s4-correct-feedback" class="canva-text feedback good hidden-panel">
+        <i data-lucide="check-circle" class="w-5 h-5"></i> כל הכבוד! תשובה נכונה.
+      </p>
+      <p data-template-id="s4-wrong-feedback" class="canva-text feedback bad hidden-panel">
+        <i data-lucide="x-circle" class="w-5 h-5"></i> טעות, לא נורא!
+      </p>
+      <div class="next-row"><button data-template-id="s4-next" class="canva-button primary-button hidden-panel" type="button" data-next="finish">לסיום משחק</button>
+      </div>
+     </article>
+    </section>
+
+    <!-- Result Screen -->
+    <section id="result-screen" class="hidden-panel max-w-[760px] mx-auto mt-8">
+     <article data-template-id="result-card" class="canva-card paper-card rounded-[28px] p-8 text-center">
+      <div class="inline-grid place-items-center w-16 h-16 rounded-full bg-[#ffd166] border-2 border-[#17213b] mb-5" aria-hidden="true">
+        <i data-lucide="trophy" style="width:30px;height:30px;"></i>
+      </div>
+      <h2 data-template-id="result-heading" class="canva-text m-0 font-extrabold text-3xl">סיימת את המסע!</h2>
+      <p data-template-id="result-copy" class="canva-text mt-3 text-lg">הנה התוצאה שלך:</p>
+      <p id="score-display" class="my-7 text-6xl font-extrabold text-[#253a72]"></p>
+      <div class="flex flex-col sm:flex-row justify-center gap-4">
+        <button id="save-button" data-template-id="save-button" class="canva-button primary-button" type="button">שמירת תוצאה</button> 
+        <button id="restart-button" data-template-id="restart-button" class="canva-button secondary-button" type="button">שחק שוב</button>
+      </div>
+      <p id="save-status" class="mt-5 font-bold" role="status" aria-live="polite"></p>
+     </article>
+    </section>
+   </main>
+   <footer class="stage-wrap pt-0">
+    <p data-template-id="footer-note" class="canva-text text-center opacity-75 mt-8">בהצלחה!</p>
+   </footer>
+  </div>
+
+  <script>
+    let playerName = "";
+    let score = 0;
+    let currentStage = 1;
+    const totalQuestions = 4;
+    const stages = [...document.querySelectorAll(".stage-panel")];
+    const questionCounter = document.querySelector('[data-template-id="question-counter"]');
+    const progressText = document.getElementById("progress-text");
+    const progressFill = document.getElementById("progress-fill");
+    const saveStatus = document.getElementById("save-status");
+
+    // דגל שמסמן אם Audio context אותחל
+    let toneStarted = false;
+
+    // --- CELEBRATION FUNCTION ---
+    async function triggerCelebration() {
+      // 1. קונפטי חזותי
+      confetti({
+        particleCount: 120,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#ffd166', '#ef6262', '#1da1a2', '#253a72']
+      });
+
+      // 2. אתחול מנוע הסאונד במידה ולא אותחל
+      if (!toneStarted) {
+        await Tone.start();
+        toneStarted = true;
+      }
+      
+      const now = Tone.now();
+
+      // צליל חגיגי (פעמון / Ta-da)
+      const synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.2, release: 1 }
+      }).toDestination();
+      synth.volume.value = -8;
+      
+      synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now);
+      synth.triggerAttackRelease(["E4", "G4", "C5"], "2n", now + 0.15);
+
+      // סימולציה של מחיאות כפיים מהקהל 
+      const clapper = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.01 }
+      }).toDestination();
+      clapper.volume.value = -12;
+      
+      // יצירת רשימת זמנים אקראית ומיון שלה בסדר עולה למניעת שגיאות תזמון
+      let clapTimes = [];
+      for (let i = 0; i < 25; i++) {
+        clapTimes.push(Math.random() * 1.5); // מחיאות כפיים מתפרסות על 1.5 שניות
+      }
+      clapTimes.sort((a, b) => a - b);
+      
+      // הפעלת מחיאות הכפיים לפי הזמנים
+      for (let i = 0; i < 25; i++) {
+        clapper.triggerAttackRelease("32n", now + clapTimes[i]);
+      }
+    }
+
+    function updateProgress() {
+      questionCounter.textContent = "שלב " + currentStage + " מתוך " + totalQuestions;
+      progressText.textContent = currentStage + " / " + totalQuestions;
+      progressFill.style.width = (currentStage / totalQuestions * 100) + "%";
+    }
+
+    function showStage(stageNumber) {
+      currentStage = stageNumber;
+      stages.forEach((stage, index) => {
+        stage.classList.toggle("hidden-panel", index !== stageNumber - 1);
+      });
+      updateProgress();
+    }
+
+    function resetGame() {
+      score = 0;
+      currentStage = 1;
+      document.querySelectorAll(".choice").forEach(button => {
+        button.disabled = false;
+        button.classList.remove("is-correct", "is-wrong");
+      });
+      document.querySelectorAll(".feedback, .next-row .primary-button").forEach(element => {
+        element.classList.add("hidden-panel");
+      });
+      saveStatus.textContent = "";
+      document.getElementById("save-button").disabled = false;
+      showStage(1);
+    }
+
+    document.getElementById("start-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = document.getElementById("player-name");
+      const error = document.getElementById("start-error");
+      const name = input.value.trim();
+
+      if (!name) {
+        error.classList.remove("hidden-panel");
+        input.focus();
+        return;
+      }
+
+      // אתחול האודיו בלחיצה הראשונה של המשתמש (דרישת דפדפנים)
+      if (!toneStarted) {
+        await Tone.start();
+        toneStarted = true;
+      }
+
+      error.classList.add("hidden-panel");
+      playerName = name;
+      resetGame();
+      document.getElementById("welcome-screen").classList.add("hidden-panel");
+      document.getElementById("game-screen").classList.remove("hidden-panel");
+    });
+
+    document.querySelectorAll(".choice").forEach(button => {
+      button.addEventListener("click", () => {
+        const card = button.closest(".stage-panel");
+        const isCorrect = button.dataset.correct === "true";
+
+        card.querySelectorAll(".choice").forEach(choice => {
+          choice.disabled = true;
+          if (choice.dataset.correct === "true") choice.classList.add("is-correct");
+        });
+
+        if (isCorrect) {
+          score += 1;
+          card.querySelector(".feedback.good").classList.remove("hidden-panel");
+          triggerCelebration(); // <-- הפעלת מחיאות הכפיים
+        } else {
+          button.classList.add("is-wrong");
+          card.querySelector(".feedback.bad").classList.remove("hidden-panel");
+        }
+
+        card.querySelector(".next-row .primary-button").classList.remove("hidden-panel");
+      });
+    });
+
+    document.querySelectorAll("[data-next]").forEach(button => {
+      button.addEventListener("click", () => {
+        const destination = button.dataset.next;
+        if (destination === "finish") {
+          document.getElementById("game-screen").classList.add("hidden-panel");
+          document.getElementById("result-screen").classList.remove("hidden-panel");
+          document.getElementById("score-display").textContent = score + " / " + totalQuestions;
+          
+          // חגיגה גדולה במיוחד אם יש ציון מושלם!
+          if (score === totalQuestions) {
+            setTimeout(triggerCelebration, 300);
+            setTimeout(triggerCelebration, 1200);
+          }
+          return;
+        }
+        showStage(Number(destination));
+      });
+    });
+
+    document.getElementById("restart-button").addEventListener("click", () => {
+      document.getElementById("result-screen").classList.add("hidden-panel");
+      document.getElementById("welcome-screen").classList.remove("hidden-panel");
+      document.getElementById("player-name").value = "";
+      document.getElementById("player-name").focus();
+    });
+
+    // === מנגנון שמירת הנתונים לגוגל שיטס ===
+    document.getElementById("save-button").addEventListener("click", async () => {
+      const saveButton = document.getElementById("save-button");
+      saveButton.disabled = true;
+      saveStatus.textContent = "שומרים את התוצאה שלך...";
+      saveStatus.style.color = "#253a72";
+
+      // !!! שימי לב: הקישור הזה צריך להתאים לקישור הסקריפט שלך !!!
+      const scriptURL = 'https://script.google.com/macros/s/AKfycbzsGr7bZZNxYIK70dfnI-26FDBpdtmwN1oeg2ubRBeNTKDhBT9Jz7xMz6yMxf3AEI4_/exec';
+      
+      const data = {
+        game_name: "שם המשחק שלך", // <--- כאן את משנה את השם בכל פעם שאת יוצרת משחק חדש
+        player_name: playerName,
+        score: score,
+        total_questions: totalQuestions
+      };
+
+      try {
+        await fetch(scriptURL, {
+          method: 'POST',
+          mode: 'no-cors', // מאפשר שליחה חלקה בלי שגיאות אבטחה של הדפדפן
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8', 
+          },
+          body: JSON.stringify(data)
+        });
+
+        // כיוון שאנו מונעים קריאת התשובה עם no-cors כדי לעקוף חסימות,
+        // נניח שההצלחה עברה כראוי אם לא נזרקה שגיאת חיבור
+        saveStatus.textContent = "ההישג נשמר בהצלחה בגיליון!";
+        saveStatus.style.color = "#155d38";
+        
+      } catch (error) {
+        console.error('Error!', error.message);
+        saveStatus.textContent = "לא הצלחנו לשמור את התוצאה. אפשר לנסות שוב.";
+        saveStatus.style.color = "#9a2923";
+        saveButton.disabled = false;
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+      updateProgress();
+      lucide.createIcons();
+    });
+  </script>
+ </body>
+</html>
